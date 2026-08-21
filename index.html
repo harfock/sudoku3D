@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>星際 3D 魔方數獨 (Cosmic 3D Cube Sudoku)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Noto+Sans+TC:wght@500;700;900&display=swap');
+    
+    body {
+      font-family: 'Noto Sans TC', 'Orbitron', sans-serif;
+      overflow: hidden;
+      touch-action: none;
+      background: #030712;
+    }
+    canvas {
+      display: block;
+      touch-action: none;
+      user-select: none;
+    }
+
+    .cosmic-plate {
+      background: linear-gradient(135deg, rgba(15, 23, 42, 0.92), rgba(30, 27, 75, 0.88));
+      border: 2px solid rgba(168, 85, 247, 0.5);
+      box-shadow: 0 0 25px rgba(147, 51, 234, 0.3), inset 0 1px 2px rgba(255, 255, 255, 0.25);
+      backdrop-filter: blur(12px);
+      border-radius: 1.5rem;
+    }
+
+    .cosmic-btn {
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      font-weight: 900;
+      border-radius: 9999px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.4), inset 0 -3px 5px rgba(0,0,0,0.7);
+      transition: all 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    .cosmic-btn:active {
+      transform: translateY(3px) scale(0.94);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.8);
+    }
+
+    .truck-container {
+      position: relative;
+      background: radial-gradient(circle at right, rgba(88, 28, 135, 0.6) 0%, rgba(15, 23, 42, 0.95) 100%);
+      border: 2px solid #a855f7;
+      box-shadow: 0 0 20px rgba(168, 85, 247, 0.3);
+      border-radius: 1.5rem;
+      overflow: hidden;
+    }
+
+    .truck-cabin {
+      position: absolute;
+      right: 8px;
+      bottom: 8px;
+      top: 8px;
+      width: 54px;
+      background: linear-gradient(145deg, #7e22ce, #3b0764);
+      border: 2px solid #f0abfc;
+      border-radius: 12px;
+      box-shadow: 0 0 15px rgba(240, 171, 252, 0.4);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    @keyframes rollDownRamp {
+      0% { transform: translateX(40px) rotate(180deg) scale(0.6); opacity: 0; }
+      100% { transform: translateX(0px) rotate(0deg) scale(1); opacity: 1; }
+    }
+
+    .rolling-crate {
+      animation: rollDownRamp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+
+    .crate-ammo {
+      min-width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: linear-gradient(145deg, #1e1b4b, #0f172a);
+      border: 2px solid #a855f7;
+      box-shadow: 0 0 10px rgba(168, 85, 247, 0.3), inset 0 1px 2px rgba(255,255,255,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      font-weight: 900;
+      color: #e9d5ff;
+      transition: all 0.2s ease;
+      touch-action: manipulation;
+      flex-shrink: 0;
+    }
+    .crate-ammo:active {
+      transform: scale(0.92);
+    }
+
+    @keyframes popIn {
+      0% { transform: scale(0.4) rotate(-8deg); opacity: 0; }
+      70% { transform: scale(1.08) rotate(3deg); opacity: 1; }
+      100% { transform: scale(1) rotate(0deg); opacity: 1; }
+    }
+    .animate-pop {
+      animation: popIn 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+  </style>
+</head>
+<body class="w-screen h-screen relative select-none text-slate-100">
+
+  <!-- START TITLE MODAL -->
+  <div id="title-screen" class="absolute inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
+    <div class="cosmic-plate max-w-lg w-full p-6 sm:p-8 flex flex-col items-center gap-5 text-center shadow-2xl border-purple-500/50">
+      <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-purple-600/20 border-4 border-purple-400/80 flex items-center justify-center text-4xl sm:text-5xl shadow-inner">
+        🧩
+      </div>
+      <div>
+        <h1 id="i18n-title" class="text-2xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-pink-300 to-amber-200 tracking-wider">
+          星際 3D 魔方數獨
+        </h1>
+        <p id="i18n-subtitle" class="text-xs sm:text-sm text-purple-200/90 mt-2 font-bold leading-relaxed">
+          點擊魔方方塊選取，再從下方太空卡車選擇數字填入！<br>
+          3x3 魔方每面使用數字 1~3、5x5 使用 1~5、9x9 使用 1~9！
+        </p>
+      </div>
+
+      <!-- Mode selection -->
+      <div class="w-full flex flex-col gap-3 text-left">
+        <label id="i18n-select-grid" class="text-xs font-black text-purple-300 tracking-widest uppercase">📐 選擇魔方規格與數字範圍：</label>
+
+        <div class="grid grid-cols-3 gap-2">
+          <button onclick="gameApp.selectGridSize(3)" id="grid-3" class="cosmic-btn py-3 bg-gradient-to-r from-purple-600 to-indigo-700 text-white border border-purple-300 text-xs sm:text-sm">
+            3x3 (1~3)
+          </button>
+          <button onclick="gameApp.selectGridSize(5)" id="grid-5" class="cosmic-btn py-3 bg-slate-900/90 text-purple-300 border border-purple-800 text-xs sm:text-sm">
+            5x5 (1~5)
+          </button>
+          <button onclick="gameApp.selectGridSize(9)" id="grid-9" class="cosmic-btn py-3 bg-slate-900/90 text-purple-300 border border-purple-800 text-xs sm:text-sm">
+            9x9 (1~9)
+          </button>
+        </div>
+      </div>
+
+      <button onclick="gameApp.startGame()" id="i18n-start-btn" class="cosmic-btn w-full py-3.5 sm:py-4 bg-gradient-to-r from-purple-500 via-pink-500 to-amber-500 text-white text-lg sm:text-xl font-black border-2 border-purple-200 shadow-2xl mt-1">
+        進入星際魔方 🚀
+      </button>
+    </div>
+  </div>
+
+  <!-- TOP SCOREBOARD / COMMAND CENTER HUD -->
+  <div id="hud-top" class="cosmic-plate absolute top-3 left-3 right-3 sm:top-4 sm:left-4 sm:right-auto sm:w-[540px] p-3 sm:p-4 flex items-center justify-between z-20 pointer-events-auto">
+    <div class="flex items-center gap-2.5 sm:gap-3">
+      <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-br from-purple-600/40 to-pink-600/40 border-2 border-purple-400/60 flex items-center justify-center text-lg sm:text-xl shadow-inner shrink-0">
+        🌌
+      </div>
+      <div>
+        <div id="i18n-hud-title" class="text-[9px] sm:text-[10px] font-black text-purple-300 tracking-wider uppercase">3D SUDOKU COMMAND CENTER</div>
+        <div class="text-[11px] sm:text-xs font-black text-white flex items-center gap-1.5 sm:gap-2 flex-wrap">
+          <span><span id="i18n-time-label">⏱️ 時間</span>: <strong id="timer-display" class="text-amber-300 font-mono">00:00</strong></span>
+          <span class="text-purple-400">|</span>
+          <span><span id="i18n-best-label">🏆 最佳</span>: <strong id="best-time-display" class="text-yellow-300 font-mono">--:--</strong></span>
+          
+          <!-- Progress bar container (Toggled via Assistant Mode) -->
+          <span id="progress-container" class="inline-flex items-center gap-1.5">
+            <span class="text-purple-400">|</span>
+            <span><span id="i18n-progress-label">完成度</span>: <strong id="score-progress" class="text-emerald-400 font-mono">0%</strong></span>
+          </span>
+
+          <span class="text-purple-400">|</span>
+          <span>通關: <strong id="score-clear" class="text-pink-300 font-mono">0</strong></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
+      <button onclick="gameApp.toggleLanguage()" id="lang-toggle-btn" class="cosmic-btn px-2 py-1 bg-indigo-800/90 text-indigo-200 text-[10px] sm:text-xs border border-indigo-400">
+        EN / 繁中
+      </button>
+      <button onclick="gameApp.returnToTitle()" id="i18n-menu-btn" class="cosmic-btn px-2 py-1 bg-slate-800/90 text-purple-300 text-[10px] sm:text-xs border border-purple-600/50">
+        選單
+      </button>
+    </div>
+  </div>
+
+  <!-- FLOATING TOOLBAR HUD (ASSIST / HINT / CHECK ERRORS) -->
+  <div id="hud-tools" class="cosmic-plate absolute top-20 left-3 right-3 sm:top-4 sm:right-4 sm:left-auto p-2 flex items-center justify-center gap-2 z-20 pointer-events-auto">
+    <button onclick="gameApp.toggleAssistant()" id="assist-toggle-btn" class="cosmic-btn px-2.5 py-1.5 bg-emerald-800/90 text-emerald-200 text-xs border border-emerald-400 flex items-center gap-1">
+      <span>🛡️</span> <span id="i18n-assist-label">輔助: 開</span>
+    </button>
+
+    <button onclick="gameApp.triggerHint()" id="hint-btn" class="cosmic-btn px-2.5 py-1.5 bg-amber-600/90 text-amber-100 text-xs border border-amber-300 flex items-center gap-1">
+      <span>💡</span> <span id="i18n-hint-label">提示</span>
+    </button>
+
+    <button onclick="gameApp.checkErrors()" id="check-btn" class="cosmic-btn px-2.5 py-1.5 bg-rose-800/90 text-rose-100 text-xs border border-rose-400 flex items-center gap-1">
+      <span>🔍</span> <span id="i18n-check-label">檢查</span>
+    </button>
+  </div>
+
+  <!-- BOTTOM CARGO TRUCK DECK HUD -->
+  <div id="hud-truck-deck" class="truck-container absolute bottom-3 left-1/2 -translate-x-1/2 w-[95%] max-w-[720px] p-2.5 sm:p-3 flex items-center justify-between z-20 pointer-events-auto">
+    
+    <!-- Left Info & Roll Ramp Area -->
+    <div class="flex flex-col gap-1.5 w-full pr-16">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-1.5">
+          <span class="text-base sm:text-xl">🚚</span>
+          <span id="i18n-cargo-label" class="text-[10px] sm:text-xs font-black text-purple-200 tracking-wider line-clamp-1">太空卡車卸貨床 (點選數字填入當前選取的魔方位置)：</span>
+        </div>
+
+        <!-- Combo display (Toggled via Assistant Mode) -->
+        <span id="combo-display" class="text-[10px] sm:text-xs font-black text-pink-400 bg-pink-950/60 border border-pink-500/40 px-2 py-0.5 rounded-full shrink-0">
+          正確數: 0/54
+        </span>
+      </div>
+
+      <!-- Cargo Bed Button Palette -->
+      <div class="w-full bg-slate-950/90 border-2 border-purple-500/40 rounded-2xl p-1.5 flex items-center justify-between gap-1 overflow-x-auto relative">
+        <div class="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-purple-500 via-pink-500 to-amber-500 opacity-60"></div>
+        <div id="truck-ramp-crates" class="flex items-center justify-start sm:justify-around w-full gap-1.5 z-10 overflow-x-auto py-0.5">
+          <!-- Dynamically generated crate ammos -->
+        </div>
+        <button onclick="gameApp.clearCurrentTile()" id="i18n-clear-btn" class="cosmic-btn px-2.5 py-1.5 bg-rose-900/80 text-rose-200 text-xs border border-rose-500/50 shrink-0 z-10">
+          清除
+        </button>
+      </div>
+
+      <div id="action-guidance" class="text-[10px] sm:text-[11px] font-bold text-cyan-300 tracking-wide text-left line-clamp-1">
+        點擊 3D 魔方方塊進行選擇 | 拖曳深空空白處旋轉魔方
+      </div>
+    </div>
+
+    <!-- Stylized Space Truck Cabin on Right -->
+    <div class="truck-cabin flex flex-col items-center justify-center text-amber-300">
+      <span class="text-base sm:text-lg">🚚</span>
+      <span class="text-[7px] sm:text-[8px] font-black text-purple-200 uppercase">Cargo</span>
+    </div>
+  </div>
+
+  <!-- VICTORY OVERLAY -->
+  <div id="victory-overlay" class="absolute inset-0 bg-slate-950/90 backdrop-blur-lg z-40 hidden flex flex-col items-center justify-center p-6 text-center animate-pop">
+    <div class="cosmic-plate max-w-md w-full p-8 flex flex-col items-center gap-5 shadow-2xl border-purple-400">
+      <div class="text-6xl sm:text-7xl animate-bounce">🏆</div>
+      <h2 id="i18n-win-title" class="text-2xl sm:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-pink-300 to-purple-300">
+        星際魔方數獨完美通關！
+      </h2>
+      
+      <!-- Random Praise Quote Display Area -->
+      <div id="praise-quote-display" class="text-sm sm:text-base font-black text-amber-200 bg-purple-950/80 border border-purple-400/50 rounded-2xl px-4 py-3 shadow-inner leading-relaxed">
+        🌟 太震撼了！你的空間推理能力堪比星際導航員！
+      </div>
+
+      <p id="i18n-win-msg" class="text-xs sm:text-sm font-bold text-purple-100/90 leading-relaxed">
+        所有 6 個立面皆無重複數字，解鎖率 100%！
+      </p>
+      <div class="text-sm sm:text-base font-black text-amber-300">
+        ⏱️ <span id="i18n-win-time">完成耗時</span>: <span id="final-time-display" class="font-mono text-white">00:00</span>
+      </div>
+      <button onclick="gameApp.nextLevel()" id="i18n-next-btn" class="cosmic-btn w-full py-3.5 sm:py-4 bg-gradient-to-r from-purple-500 via-pink-500 to-amber-500 text-white text-base sm:text-lg font-black border-2 border-purple-200 shadow-2xl">
+        挑戰下一個魔方 🚀
+      </button>
+    </div>
+  </div>
+
+  <!-- THREE.JS CANVAS -->
+  <div id="canvas-container" class="w-full h-full"></div>
+
+  <script>
+    const I18N = {
+      zh: {
+        title: "星際 3D 魔方數獨",
+        subtitle: "點擊魔方方塊選取，再從下方太空卡車選擇數字填入！<br>3x3 魔方每面使用數字 1~3、5x5 使用 1~5、9x9 使用 1~9！",
+        selectGrid: "📐 選擇魔方規格與數字範圍：",
+        startBtn: "進入星際魔方 🚀",
+        hudTitle: "3D SUDOKU COMMAND CENTER",
+        timeLabel: "⏱️ 時間",
+        bestLabel: "🏆 最佳",
+        progressLabel: "完成度",
+        correctCountLabel: "正確數",
+        menuBtn: "選單",
+        assistLabelOn: "輔助: 開",
+        assistLabelOff: "輔助: 關",
+        hintLabel: "提示",
+        checkLabel: "檢查",
+        cargoLabel: "太空卡車卸貨床 (點選數字填入當前選取的魔方位置)：",
+        clearBtn: "清除",
+        defaultGuidance: "點擊 3D 魔方方塊進行選擇 | 拖曳深空空白處旋轉魔方",
+        winTitle: "星際魔方數獨完美通關！",
+        winMsg: "所有 6 個立面皆無重複數字，解鎖率 100%！",
+        winTime: "完成耗時",
+        nextBtn: "挑戰下一個魔方 🚀",
+        promptSelect: "💡 請先點擊 3D 魔方上的任意方塊，再選擇數字！",
+        promptFixed: "⚠️ 無法修改預填固定方塊！",
+        promptRowConflict: "❌ 同一行或同一列已有重複數字",
+        promptCorrect: "🎯 填入數字",
+        promptWrongAssist: "❌ [輔助開啟] 該數字不符合此位置的最佳解答！",
+        promptWrongFree: "⚠️ 已填入數字（提示：請注意是否有重複）",
+        promptHintUsed: "💡 智能提示：已為您自動填入位置",
+        promptCheckErrorsFound: "🔍 檢查完畢：已為您標示錯誤數字方塊！",
+        promptCheckNoErrors: "✨ 檢查完畢：目前填入的數字完全正確！",
+        promptCleared: "已清除該位置數字"
+      },
+      en: {
+        title: "Cosmic 3D Cube Sudoku",
+        subtitle: "Click/tap a block on the 3D Cube, then select a number from the truck below!<br>3x3 uses 1–3, 5x5 uses 1–5, 9x9 uses 1–9 per face!",
+        selectGrid: "📐 Select Cube Grid Size & Number Range:",
+        startBtn: "Enter Cosmic Cube 🚀",
+        hudTitle: "3D SUDOKU COMMAND CENTER",
+        timeLabel: "⏱️ Time",
+        bestLabel: "🏆 Best",
+        progressLabel: "Progress",
+        correctCountLabel: "Correct",
+        menuBtn: "Menu",
+        assistLabelOn: "Assist: ON",
+        assistLabelOff: "Assist: OFF",
+        hintLabel: "Hint",
+        checkLabel: "Check",
+        cargoLabel: "Space Truck Cargo Deck (Select number to fill active tile):",
+        clearBtn: "Clear",
+        defaultGuidance: "Tap 3D tile to select | Drag deep space to orbit cube",
+        winTitle: "Cosmic Cube Sudoku Solved!",
+        winMsg: "All 6 faces satisfied without duplicate numbers! 100% Cleared!",
+        winTime: "Time Elapsed",
+        nextBtn: "Challenge Next Cube 🚀",
+        promptSelect: "💡 Tap any block on the 3D Cube first!",
+        promptFixed: "⚠️ Cannot alter fixed given blocks!",
+        promptRowConflict: "❌ Duplicate number already in same row or column",
+        promptCorrect: "🎯 Filled correct number",
+        promptWrongAssist: "❌ [Assist ON] Number does not match the solution!",
+        promptWrongFree: "⚠️ Filled number (Tip: check for row/col duplicates)",
+        promptHintUsed: "💡 Hint: Automatically filled tile at",
+        promptCheckErrorsFound: "🔍 Check complete: Highlighted incorrect numbers!",
+        promptCheckNoErrors: "✨ Check complete: All current entries are correct!",
+        promptCleared: "Cleared selected block"
+      }
+    };
+
+    const PRAISE_QUOTES = {
+      zh: [
+        "🌟 太震撼了！你的空間推理能力堪比星際導航員！",
+        "🚀 超凡智力！3D 魔方數獨對你而言簡直易如反掌！",
+        "🌌 星系級大腦！全宇宙都在為你的精準邏輯歡呼！",
+        "💎 完美無瑕！你展現了極致的邏輯思考美學！",
+        "🧠 智商破表！魔方數獨在你面前毫無秘密可言！",
+        "✨ 神級操作！你已成功登頂星際數獨大師的寶座！",
+        "🎯 驚人敏銳！每一個數字定位都堪稱邏輯典範！",
+        "🏆 絕世奇才！超越極限的深空魔方破譯者！",
+        "💫 璀璨星光！你的智慧比超新星爆發還要耀眼！",
+        "⚡ 極速解密！神級空間感知力撼動全宇宙！",
+        "🛡️ 宇宙主宰！無可挑剔的魔方數獨征服者！",
+        "👑 大師風範！完美的全局視野與超凡耐力！"
+      ],
+      en: [
+        "🌟 Astounding! Your spatial reasoning rivals an interstellar navigator!",
+        "🚀 Supreme Intellect! Solving 3D Sudoku cubes is effortless for you!",
+        "🌌 Galaxy-Brain Play! The whole universe applauds your flawless logic!",
+        "💎 Pure Perfection! A masterclass in logical elegance!",
+        "🧠 Mind-Blowing Precision! No cube puzzle stands in your way!",
+        "✨ Legendary Execution! You've claimed the cosmic Sudoku throne!",
+        "🎯 Astonishing Accuracy! Every number placed was pure tactical genius!",
+        "🏆 Grand Prodigy! A puzzle master who transcends cosmic limits!",
+        "💫 Supernova Brilliance! Your intellect outshines exploding stars!",
+        "⚡ Lightning Cipher! Divine spatial awareness sweeps the galaxy!",
+        "🛡️ Cosmic Overlord! An impeccable conqueror of 3D number grids!",
+        "👑 Masterclass Vision! Incredible foresight paired with boundless focus!"
+      ]
+    };
+
+    class CosmicSoundFX {
+      constructor() { this.ctx = null; }
+      init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
+      playSelect() {
+        this.init();
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator(), gain = this.ctx.createGain();
+        osc.type = 'sine'; osc.frequency.setValueAtTime(400, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(800, this.ctx.currentTime + 0.08);
+        gain.gain.setValueAtTime(0.25, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(); osc.stop(this.ctx.currentTime + 0.08);
+      }
+      playPlace() {
+        this.init();
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator(), gain = this.ctx.createGain();
+        osc.type = 'triangle'; osc.frequency.setValueAtTime(300, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(600, this.ctx.currentTime + 0.12);
+        gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.12);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(); osc.stop(this.ctx.currentTime + 0.12);
+      }
+      playClang() {
+        this.init();
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator(), gain = this.ctx.createGain();
+        osc.type = 'square'; osc.frequency.setValueAtTime(450, this.ctx.currentTime);
+        osc.frequency.setValueAtTime(180, this.ctx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.35, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(); osc.stop(this.ctx.currentTime + 0.25);
+      }
+      playSuccess() {
+        this.init();
+        if (!this.ctx) return;
+        const notes = [523.25, 659.25, 783.99, 1046.50];
+        notes.forEach((f, i) => {
+          const osc = this.ctx.createOscillator(), gain = this.ctx.createGain();
+          osc.type = 'sine'; osc.frequency.setValueAtTime(f, this.ctx.currentTime + i * 0.05);
+          gain.gain.setValueAtTime(0.25, this.ctx.currentTime + i * 0.05);
+          gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + i * 0.05 + 0.3);
+          osc.connect(gain); gain.connect(this.ctx.destination);
+          osc.start(this.ctx.currentTime + i * 0.05);
+          osc.stop(this.ctx.currentTime + i * 0.05 + 0.3);
+        });
+      }
+    }
+
+    class CosmicCubeSudokuDirectApp {
+      constructor() {
+        this.gridSize = 3;
+        this.lang = 'zh';
+        this.assistantMode = true;
+
+        this.clearCount = parseInt(localStorage.getItem('cosmic_cube_clears') || '0', 10);
+        const clearElem = document.getElementById('score-clear');
+        if (clearElem) clearElem.innerText = this.clearCount;
+
+        this.sound = new CosmicSoundFX();
+        this.selectedTile = null;
+
+        this.cubeNodes = [];
+        this.textureCache = {};
+
+        this.playSeconds = 0;
+        this.timerInterval = null;
+
+        this.isDragging = false;
+        this.hasMoved = false;
+        this.dragStart = { x: 0, y: 0 };
+        this.lastTouchDist = 0;
+        
+        this.rotVelocity = { x: 0, y: 0 };
+
+        this.raycaster = new THREE.Raycaster();
+        this.mouse = new THREE.Vector2();
+
+        this.setupThreeJS();
+        this.initControls();
+        this.updateI18nText();
+        window.addEventListener('resize', () => this.onWindowResize());
+      }
+
+      setupThreeJS() {
+        const container = document.getElementById('canvas-container');
+        this.scene = new THREE.Scene();
+        this.scene.fog = new THREE.FogExp2(0x030712, 0.012);
+
+        this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        this.cameraDistance = 28;
+        this.updateCameraPos();
+
+        this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.renderer.shadowMap.enabled = true;
+        container.appendChild(this.renderer.domElement);
+
+        this.scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+        const dirLight = new THREE.DirectionalLight(0xe9d5ff, 1.2);
+        dirLight.position.set(-20, 35, 25);
+        this.scene.add(dirLight);
+
+        this.buildStarfield();
+        this.buildPlanets();
+
+        this.cubeGroup = new THREE.Group();
+        this.scene.add(this.cubeGroup);
+      }
+
+      updateCameraPos() {
+        this.camera.position.set(0, 8, this.cameraDistance);
+        this.camera.lookAt(0, 0, 0);
+      }
+
+      buildStarfield() {
+        const count = 1200;
+        const geo = new THREE.BufferGeometry();
+        const positions = new Float32Array(count * 3);
+        for (let i = 0; i < count * 3; i += 3) {
+          positions[i] = (Math.random() - 0.5) * 220;
+          positions[i+1] = (Math.random() - 0.5) * 220;
+          positions[i+2] = (Math.random() - 0.5) * 220;
+        }
+        geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        const mat = new THREE.PointsMaterial({ color: 0xe9d5ff, size: 0.7, transparent: true, opacity: 0.8 });
+        this.scene.add(new THREE.Points(geo, mat));
+      }
+
+      buildPlanets() {
+        const planetGeo = new THREE.SphereGeometry(8, 32, 32);
+        const planetMat = new THREE.MeshStandardMaterial({ color: 0x4c1d95, roughness: 0.8 });
+        const gasGiant = new THREE.Mesh(planetGeo, planetMat);
+        gasGiant.position.set(45, -20, -40);
+        this.scene.add(gasGiant);
+      }
+
+      getMultiFaceTexture(val, isGiven, isSelected = false, isError = false) {
+        const key = `${val}_${isGiven}_${isSelected}_${isError}_${this.gridSize}`;
+        if (this.textureCache[key]) return this.textureCache[key];
+
+        const canvas = document.createElement('canvas');
+        canvas.width = 256; canvas.height = 256;
+        const ctx = canvas.getContext('2d');
+
+        if (isError) {
+          ctx.fillStyle = '#881337';
+        } else if (isSelected) {
+          ctx.fillStyle = '#7e22ce';
+        } else {
+          ctx.fillStyle = isGiven ? '#312e81' : '#0f172a';
+        }
+        ctx.fillRect(0, 0, 256, 256);
+
+        ctx.strokeStyle = isError ? '#fda4af' : isSelected ? '#f0abfc' : isGiven ? '#f59e0b' : '#c084fc';
+        ctx.lineWidth = isSelected || isError ? 24 : 16;
+        ctx.strokeRect(10, 10, 236, 236);
+
+        if (val > 0) {
+          ctx.font = '900 130px system-ui, sans-serif';
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillStyle = isError ? '#ffe4e6' : isGiven ? '#fbbf24' : '#ffffff';
+          ctx.fillText(val.toString(), 128, 134);
+        }
+
+        const texture = new THREE.CanvasTexture(canvas);
+        this.textureCache[key] = texture;
+        return texture;
+      }
+
+      createBlockMesh(val, isGiven, isSelected = false, isError = false) {
+        const blockSize = 11.5 / (this.gridSize * 1.25);
+        const geo = new THREE.BoxGeometry(blockSize, blockSize, blockSize);
+        const texture = this.getMultiFaceTexture(val, isGiven, isSelected, isError);
+
+        const faceMat = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.3 });
+        const materials = [faceMat, faceMat, faceMat, faceMat, faceMat, faceMat];
+        const mesh = new THREE.Mesh(geo, materials);
+        mesh.castShadow = true; mesh.receiveShadow = true;
+        return mesh;
+      }
+
+      updateBlockMeshTexture(node) {
+        const isSelected = (node === this.selectedTile);
+        const texture = this.getMultiFaceTexture(node.val, node.isGiven, isSelected, node.isError);
+        for (let i = 0; i < 6; i++) {
+          node.mesh.material[i].map = texture;
+          node.mesh.material[i].needsUpdate = true;
+        }
+
+        if (isSelected) {
+          node.mesh.scale.set(1.15, 1.15, 1.15);
+        } else {
+          node.mesh.scale.set(1.0, 1.0, 1.0);
+        }
+      }
+
+      selectGridSize(size) {
+        this.gridSize = size;
+        [3, 5, 9].forEach(s => {
+          const btn = document.getElementById(`grid-${s}`);
+          if (btn) {
+            if (s === size) {
+              btn.className = "cosmic-btn py-3 bg-gradient-to-r from-purple-600 to-indigo-700 text-white border border-purple-300 text-xs sm:text-sm";
+            } else {
+              btn.className = "cosmic-btn py-3 bg-slate-900/90 text-purple-300 border border-purple-800 text-xs sm:text-sm";
+            }
+          }
+        });
+      }
+
+      toggleLanguage() {
+        this.lang = this.lang === 'zh' ? 'en' : 'zh';
+        this.updateI18nText();
+      }
+
+      updateI18nText() {
+        const t = I18N[this.lang];
+        document.getElementById('i18n-title').innerHTML = t.title;
+        document.getElementById('i18n-subtitle').innerHTML = t.subtitle;
+        document.getElementById('i18n-select-grid').innerText = t.selectGrid;
+        document.getElementById('i18n-start-btn').innerText = t.startBtn;
+        document.getElementById('i18n-hud-title').innerText = t.hudTitle;
+        document.getElementById('i18n-time-label').innerText = t.timeLabel;
+        document.getElementById('i18n-best-label').innerText = t.bestLabel;
+        document.getElementById('i18n-progress-label').innerText = t.progressLabel;
+        document.getElementById('i18n-menu-btn').innerText = t.menuBtn;
+        document.getElementById('i18n-hint-label').innerText = t.hintLabel;
+        document.getElementById('i18n-check-label').innerText = t.checkLabel;
+        document.getElementById('i18n-cargo-label').innerText = t.cargoLabel;
+        document.getElementById('i18n-clear-btn').innerText = t.clearBtn;
+        document.getElementById('i18n-win-title').innerText = t.winTitle;
+        document.getElementById('i18n-win-msg').innerText = t.winMsg;
+        document.getElementById('i18n-win-time').innerText = t.winTime;
+        document.getElementById('i18n-next-btn').innerText = t.nextBtn;
+        this.updateGuidance(t.defaultGuidance);
+
+        const assistElem = document.getElementById('assist-toggle-btn').querySelector('#i18n-assist-label');
+        if (assistElem) assistElem.innerText = this.assistantMode ? t.assistLabelOn : t.assistLabelOff;
+        this.updateBestTimeDisplay();
+        this.updateProgressDisplay();
+      }
+
+      updateGuidance(msg) {
+        const el = document.getElementById('action-guidance');
+        if (el) el.innerText = msg;
+      }
+
+      toggleAssistant() {
+        this.assistantMode = !this.assistantMode;
+        const t = I18N[this.lang];
+        const assistElem = document.getElementById('assist-toggle-btn').querySelector('#i18n-assist-label');
+        if (assistElem) assistElem.innerText = this.assistantMode ? t.assistLabelOn : t.assistLabelOff;
+        document.getElementById('assist-toggle-btn').className = `cosmic-btn px-2.5 py-1.5 text-xs border flex items-center gap-1 ${
+          this.assistantMode ? 'bg-emerald-800/90 text-emerald-200 border-emerald-400' : 'bg-slate-800/90 text-slate-300 border-slate-600'
+        }`;
+
+        // Toggle visibility of progress bar & correct count badge based on Assistant state
+        this.updateProgressDisplay();
+      }
+
+      startTimer() {
+        this.stopTimer();
+        this.playSeconds = 0;
+        this.updateTimerDisplay();
+        this.timerInterval = setInterval(() => {
+          this.playSeconds++;
+          this.updateTimerDisplay();
+        }, 1000);
+      }
+
+      stopTimer() {
+        if (this.timerInterval) {
+          clearInterval(this.timerInterval);
+          this.timerInterval = null;
+        }
+      }
+
+      updateTimerDisplay() {
+        const m = Math.floor(this.playSeconds / 60).toString().padStart(2, '0');
+        const s = (this.playSeconds % 60).toString().padStart(2, '0');
+        const el = document.getElementById('timer-display');
+        if (el) el.innerText = `${m}:${s}`;
+      }
+
+      updateBestTimeDisplay() {
+        const bestKey = `cosmic_best_time_${this.gridSize}`;
+        const bestSecs = localStorage.getItem(bestKey);
+        const el = document.getElementById('best-time-display');
+        if (!el) return;
+        if (bestSecs) {
+          const m = Math.floor(parseInt(bestSecs, 10) / 60).toString().padStart(2, '0');
+          const s = (parseInt(bestSecs, 10) % 60).toString().padStart(2, '0');
+          el.innerText = `${m}:${s}`;
+        } else {
+          el.innerText = '--:--';
+        }
+      }
+
+      recordBestTime() {
+        const bestKey = `cosmic_best_time_${this.gridSize}`;
+        const prevBest = localStorage.getItem(bestKey);
+        if (!prevBest || this.playSeconds < parseInt(prevBest, 10)) {
+          localStorage.setItem(bestKey, this.playSeconds.toString());
+          this.updateBestTimeDisplay();
+        }
+      }
+
+      startGame() {
+        document.getElementById('title-screen').style.display = 'none';
+        this.cubeGroup.rotation.y = 0;
+        this.cubeGroup.rotation.x = 0;
+        this.rotVelocity = { x: 0, y: 0 };
+        this.selectedTile = null;
+
+        this.buildValidSudokuCubeLevel();
+        this.renderTruckCargoBed();
+        this.updateProgressDisplay();
+        this.updateBestTimeDisplay();
+        this.startTimer();
+
+        if (!this.loopRunning) {
+          this.loopRunning = true;
+          this.animate();
+        }
+      }
+
+      returnToTitle() {
+        this.stopTimer();
+        document.getElementById('title-screen').style.display = 'flex';
+        document.getElementById('victory-overlay').classList.add('hidden');
+      }
+
+      nextLevel() {
+        document.getElementById('victory-overlay').classList.add('hidden');
+        this.clearCount++;
+        localStorage.setItem('cosmic_cube_clears', this.clearCount.toString());
+        const clearElem = document.getElementById('score-clear');
+        if (clearElem) clearElem.innerText = this.clearCount;
+        this.startGame();
+      }
+
+      generateLatinSquare(N) {
+        const grid = Array.from({ length: N }, () => Array(N).fill(0));
+        
+        if (N === 3) {
+          const shift = Math.floor(Math.random() * 2) + 1;
+          for (let r = 0; r < 3; r++) {
+            for (let c = 0; c < 3; c++) {
+              grid[r][c] = ((r * shift + c) % 3) + 1;
+            }
+          }
+        } else if (N === 5) {
+          const shift = Math.floor(Math.random() * 3) + 2;
+          for (let r = 0; r < 5; r++) {
+            for (let c = 0; c < 5; c++) {
+              grid[r][c] = ((r * shift + c) % 5) + 1;
+            }
+          }
+        } else if (N === 9) {
+          for (let r = 0; r < 9; r++) {
+            for (let c = 0; c < 9; c++) {
+              grid[r][c] = ((Math.floor(r / 3) + (r % 3) * 3 + c) % 9) + 1;
+            }
+          }
+        }
+
+        const symbols = Array.from({ length: N }, (_, i) => i + 1).sort(() => Math.random() - 0.5);
+        for (let r = 0; r < N; r++) {
+          for (let c = 0; c < N; c++) {
+            grid[r][c] = symbols[grid[r][c] - 1];
+          }
+        }
+
+        return grid;
+      }
+
+      buildValidSudokuCubeLevel() {
+        while (this.cubeGroup.children.length > 0) {
+          this.cubeGroup.remove(this.cubeGroup.children[0]);
+        }
+        this.cubeNodes = [];
+
+        const N = this.gridSize;
+        const spacing = 12 / N;
+        const offset = 6;
+        const givenRatio = N === 3 ? 0.45 : N === 5 ? 0.35 : 0.25;
+
+        const faces = [
+          { faceIdx: 0, rot: [0, 0, 0] },
+          { faceIdx: 1, rot: [0, Math.PI, 0] },
+          { faceIdx: 2, rot: [0, Math.PI / 2, 0] },
+          { faceIdx: 3, rot: [0, -Math.PI / 2, 0] },
+          { faceIdx: 4, rot: [-Math.PI / 2, 0, 0] },
+          { faceIdx: 5, rot: [Math.PI / 2, 0, 0] }
+        ];
+
+        faces.forEach(f => {
+          const solutionGrid = this.generateLatinSquare(N);
+
+          for (let r = 0; r < N; r++) {
+            for (let c = 0; c < N; c++) {
+              const solVal = solutionGrid[r][c];
+              const isGiven = Math.random() < givenRatio;
+              const initVal = isGiven ? solVal : 0;
+
+              const mesh = this.createBlockMesh(initVal, isGiven);
+
+              const lx = (c - (N - 1) / 2) * spacing;
+              const ly = ((N - 1) / 2 - r) * spacing;
+              const lz = offset;
+
+              const pos = new THREE.Vector3(lx, ly, lz);
+              pos.applyEuler(new THREE.Euler(...f.rot));
+
+              mesh.position.copy(pos);
+              this.cubeGroup.add(mesh);
+
+              const node = {
+                faceIdx: f.faceIdx, r, c,
+                val: initVal,
+                solutionVal: solVal,
+                isGiven,
+                isError: false,
+                mesh
+              };
+              mesh.userData = node;
+              this.cubeNodes.push(node);
+            }
+          }
+        });
+      }
+
+      renderTruckCargoBed() {
+        const container = document.getElementById('truck-ramp-crates');
+        if (!container) return;
+        container.innerHTML = '';
+        const maxNum = this.gridSize;
+
+        for (let i = 1; i <= maxNum; i++) {
+          const btn = document.createElement('button');
+          btn.className = 'crate-ammo rolling-crate';
+          btn.innerText = i.toString();
+          btn.onclick = () => {
+            this.fillSelectedTileWithNumber(i);
+          };
+          container.appendChild(btn);
+        }
+      }
+
+      fillSelectedTileWithNumber(num) {
+        const t = I18N[this.lang];
+        if (!this.selectedTile) {
+          this.updateGuidance(t.promptSelect);
+          return;
+        }
+
+        if (this.selectedTile.isGiven) {
+          this.sound.playClang();
+          this.updateGuidance(t.promptFixed);
+          return;
+        }
+
+        // ONLY run duplicate checking and solution checks if Assistant is OPEN!
+        if (this.assistantMode) {
+          const { faceIdx, r, c } = this.selectedTile;
+
+          let hasConflict = false;
+          for (let node of this.cubeNodes) {
+            if (node.faceIdx === faceIdx && node !== this.selectedTile) {
+              if ((node.r === r || node.c === c) && node.val === num) {
+                hasConflict = true;
+                break;
+              }
+            }
+          }
+
+          if (hasConflict) {
+            this.sound.playClang();
+            this.updateGuidance(`${t.promptRowConflict} (${num})!`);
+            return;
+          }
+
+          if (num !== this.selectedTile.solutionVal) {
+            this.sound.playClang();
+            this.updateGuidance(t.promptWrongAssist);
+            return;
+          }
+        }
+
+        // Fill number directly (Free mode when Assistant is OFF, or passed Assistant check when ON)
+        this.selectedTile.val = num;
+        this.selectedTile.isError = false;
+        this.updateBlockMeshTexture(this.selectedTile);
+
+        if (num === this.selectedTile.solutionVal) {
+          this.sound.playSuccess();
+          this.updateGuidance(`${t.promptCorrect} ${num}!`);
+        } else {
+          this.sound.playPlace();
+          this.updateGuidance(t.promptWrongFree);
+        }
+
+        this.updateProgressDisplay();
+        this.checkVictoryCondition();
+      }
+
+      triggerHint() {
+        const t = I18N[this.lang];
+        const emptyNodes = this.cubeNodes.filter(n => !n.isGiven && n.val !== n.solutionVal);
+        
+        if (emptyNodes.length === 0) {
+          this.updateGuidance('✨ All tiles filled correctly!');
+          return;
+        }
+
+        const hintNode = emptyNodes[Math.floor(Math.random() * emptyNodes.length)];
+        hintNode.val = hintNode.solutionVal;
+        hintNode.isError = false;
+        
+        const prevSelected = this.selectedTile;
+        this.selectedTile = hintNode;
+
+        if (prevSelected) this.updateBlockMeshTexture(prevSelected);
+        this.updateBlockMeshTexture(hintNode);
+
+        this.sound.playSuccess();
+        this.updateProgressDisplay();
+        this.updateGuidance(`${t.promptHintUsed} (Face ${hintNode.faceIdx + 1}, Row ${hintNode.r + 1}, Col ${hintNode.c + 1}) = ${hintNode.solutionVal}`);
+
+        this.checkVictoryCondition();
+      }
+
+      checkErrors() {
+        const t = I18N[this.lang];
+        let errorCount = 0;
+
+        this.cubeNodes.forEach(n => {
+          if (!n.isGiven && n.val > 0 && n.val !== n.solutionVal) {
+            n.isError = true;
+            errorCount++;
+          } else {
+            n.isError = false;
+          }
+          this.updateBlockMeshTexture(n);
+        });
+
+        if (errorCount > 0) {
+          this.sound.playClang();
+          this.updateGuidance(t.promptCheckErrorsFound);
+        } else {
+          this.sound.playSuccess();
+          this.updateGuidance(t.promptCheckNoErrors);
+        }
+      }
+
+      clearCurrentTile() {
+        if (this.selectedTile && !this.selectedTile.isGiven) {
+          this.selectedTile.val = 0;
+          this.selectedTile.isError = false;
+          this.updateBlockMeshTexture(this.selectedTile);
+          this.updateProgressDisplay();
+          this.updateGuidance(I18N[this.lang].promptCleared);
+        }
+      }
+
+      initControls() {
+        const dom = this.renderer.domElement;
+
+        const getPos = (e) => {
+          const t = e.touches ? e.touches[0] : e;
+          return { x: t.clientX, y: t.clientY };
+        };
+
+        const getTouchDist = (e) => {
+          if (!e.touches || e.touches.length < 2) return 0;
+          const dx = e.touches[0].clientX - e.touches[1].clientX;
+          const dy = e.touches[0].clientY - e.touches[1].clientY;
+          return Math.sqrt(dx * dx + dy * dy);
+        };
+
+        const onDown = (e) => {
+          if (e.target !== dom) return;
+
+          if (e.touches && e.touches.length === 2) {
+            this.lastTouchDist = getTouchDist(e);
+            return;
+          }
+
+          const pos = getPos(e);
+          this.isDragging = true;
+          this.hasMoved = false;
+          this.dragStart = pos;
+          this.rotVelocity = { x: 0, y: 0 };
+        };
+
+        const onMove = (e) => {
+          if (e.touches && e.touches.length === 2) {
+            const dist = getTouchDist(e);
+            if (this.lastTouchDist > 0) {
+              const diff = this.lastTouchDist - dist;
+              this.cameraDistance = Math.min(Math.max(16, this.cameraDistance + diff * 0.05), 55);
+              this.updateCameraPos();
+            }
+            this.lastTouchDist = dist;
+            return;
+          }
+
+          if (!this.isDragging) return;
+          const pos = getPos(e);
+          const dx = pos.x - this.dragStart.x;
+          const dy = pos.y - this.dragStart.y;
+
+          if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+            this.hasMoved = true;
+            this.rotVelocity.y = dx * 0.008;
+            this.rotVelocity.x = dy * 0.005;
+            this.cubeGroup.rotation.y += this.rotVelocity.y;
+            this.cubeGroup.rotation.x += this.rotVelocity.x;
+            this.dragStart = pos;
+          }
+        };
+
+        const onUp = (e) => {
+          if (e.target !== dom) {
+            this.isDragging = false;
+            return;
+          }
+
+          if (!this.hasMoved && this.isDragging) {
+            this.handleDirectTileTap(e);
+          }
+          this.isDragging = false;
+          this.lastTouchDist = 0;
+        };
+
+        const onWheel = (e) => {
+          this.cameraDistance = Math.min(Math.max(16, this.cameraDistance + e.deltaY * 0.02), 55);
+          this.updateCameraPos();
+        };
+
+        dom.addEventListener('mousedown', onDown);
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+        dom.addEventListener('wheel', onWheel, { passive: true });
+
+        dom.addEventListener('touchstart', onDown, { passive: true });
+        window.addEventListener('touchmove', onMove, { passive: true });
+        window.addEventListener('touchend', onUp);
+      }
+
+      handleDirectTileTap(e) {
+        const touch = e.changedTouches ? e.changedTouches[0] : e;
+        this.mouse.x = (touch.clientX / window.innerWidth) * 2 - 1;
+        this.mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1;
+
+        this.raycaster.setFromCamera(this.mouse, this.camera);
+        const intersects = this.raycaster.intersectObjects(this.cubeGroup.children);
+
+        if (intersects.length > 0) {
+          const hitMesh = intersects[0].object;
+          if (hitMesh.userData) {
+            const prevSelected = this.selectedTile;
+            this.selectedTile = hitMesh.userData;
+
+            if (prevSelected) this.updateBlockMeshTexture(prevSelected);
+            this.updateBlockMeshTexture(this.selectedTile);
+
+            this.sound.playSelect();
+            const { faceIdx, r, c, isGiven } = this.selectedTile;
+            this.updateGuidance(`Selected (Face ${faceIdx + 1}, Row ${r + 1}, Col ${c + 1}) ${isGiven ? '[Fixed]' : ''}`);
+          }
+        }
+      }
+
+      updateProgressDisplay() {
+        const correctCount = this.cubeNodes.filter(n => n.val > 0 && n.val === n.solutionVal).length;
+        const total = this.cubeNodes.length;
+        const pct = total > 0 ? Math.floor((correctCount / total) * 100) : 0;
+
+        const progContainer = document.getElementById('progress-container');
+        const comboEl = document.getElementById('combo-display');
+
+        // Only show progress bar & correct count badge if Assistant is OPEN!
+        if (this.assistantMode) {
+          if (progContainer) progContainer.style.display = 'inline-flex';
+          if (comboEl) comboEl.style.display = 'inline-block';
+
+          const progEl = document.getElementById('score-progress');
+          if (progEl) progEl.innerText = `${pct}%`;
+          if (comboEl) comboEl.innerText = `${I18N[this.lang].correctCountLabel}: ${correctCount}/${total}`;
+        } else {
+          if (progContainer) progContainer.style.display = 'none';
+          if (comboEl) comboEl.style.display = 'none';
+        }
+      }
+
+      checkVictoryCondition() {
+        if (this.cubeNodes.length > 0 && this.cubeNodes.every(n => n.val === n.solutionVal)) {
+          this.stopTimer();
+          this.recordBestTime();
+
+          const m = Math.floor(this.playSeconds / 60).toString().padStart(2, '0');
+          const s = (this.playSeconds % 60).toString().padStart(2, '0');
+          document.getElementById('final-time-display').innerText = `${m}:${s}`;
+
+          // Pick and display one of 12 random praise quotes
+          const quotes = PRAISE_QUOTES[this.lang] || PRAISE_QUOTES.zh;
+          const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
+          const quoteEl = document.getElementById('praise-quote-display');
+          if (quoteEl) quoteEl.innerText = randomQuote;
+
+          document.getElementById('victory-overlay').classList.remove('hidden');
+        }
+      }
+
+      animate() {
+        requestAnimationFrame(() => this.animate());
+
+        // Smooth rotation inertia
+        if (!this.isDragging) {
+          this.cubeGroup.rotation.y += this.rotVelocity.y;
+          this.cubeGroup.rotation.x += this.rotVelocity.x;
+          this.rotVelocity.y *= 0.92;
+          this.rotVelocity.x *= 0.92;
+        }
+
+        this.renderer.render(this.scene, this.camera);
+      }
+
+      onWindowResize() {
+        this.camera.aspect = window.innerWidth / window.innerHeight;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+    }
+
+    let gameApp;
+    window.onload = () => {
+      gameApp = new CosmicCubeSudokuDirectApp();
+    };
+  </script>
+</body>
+</html>
