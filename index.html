@@ -21,12 +21,17 @@
       user-select: none;
     }
 
+    /* Clean HUD without heavy backdrop panel, using text shadows for 100% legibility */
     .cosmic-plate {
-      background: linear-gradient(135deg, rgba(15, 23, 42, 0.92), rgba(30, 27, 75, 0.88));
-      border: 2px solid rgba(168, 85, 247, 0.5);
-      box-shadow: 0 0 25px rgba(147, 51, 234, 0.3), inset 0 1px 2px rgba(255, 255, 255, 0.25);
-      backdrop-filter: blur(12px);
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      backdrop-filter: none;
       border-radius: 1.5rem;
+    }
+
+    .hud-text-glow {
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.95), 0 0 12px rgba(0, 0, 0, 0.9), 0 0 6px rgba(168, 85, 247, 0.7);
     }
 
     .cosmic-btn {
@@ -34,7 +39,7 @@
       -webkit-tap-highlight-color: transparent;
       font-weight: 900;
       border-radius: 9999px;
-      box-shadow: 0 6px 20px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.4), inset 0 -3px 5px rgba(0,0,0,0.7);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.8), inset 0 1px 2px rgba(255,255,255,0.4), inset 0 -2px 4px rgba(0,0,0,0.7);
       transition: all 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }
     .cosmic-btn:active {
@@ -42,30 +47,30 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.8);
     }
 
-    /* Floating Draggable Number Palette Styling */
+    /* Floating Draggable Number Palette Styling - Backdrop removed for clean overlay */
     .floating-num-bar {
       position: fixed;
       z-index: 35;
       touch-action: none;
       user-select: none;
-      background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 27, 75, 0.92));
-      border: 2px solid rgba(168, 85, 247, 0.6);
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7), 0 0 20px rgba(168, 85, 247, 0.3);
-      backdrop-filter: blur(14px);
+      background: rgba(15, 23, 42, 0.4);
+      border: 1px solid rgba(168, 85, 247, 0.4);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(8px);
       border-radius: 1.25rem;
-      transition: box-shadow 0.2s ease;
+      transition: box-shadow 0.2s ease, opacity 0.2s ease;
     }
     .floating-num-bar:active {
-      box-shadow: 0 15px 35px rgba(168, 85, 247, 0.4), 0 0 25px rgba(216, 180, 254, 0.5);
+      box-shadow: 0 12px 30px rgba(168, 85, 247, 0.4);
     }
 
-    /* HUD 80% Transparency */
+    /* HUD Legibility & Visibility */
     #hud-top, #hud-tools, .floating-num-bar {
-      opacity: 0.8;
+      opacity: 0.95;
       transition: opacity 0.2s ease-in-out;
     }
     #hud-top:hover, #hud-tools:hover, .floating-num-bar:hover {
-      opacity: 0.95;
+      opacity: 1;
     }
 
     .drag-handle {
@@ -158,14 +163,14 @@
   </div>
 
   <!-- TOP SCOREBOARD / COMMAND CENTER HUD -->
-  <div id="hud-top" class="cosmic-plate absolute top-3 left-3 right-3 sm:top-4 sm:left-4 sm:right-auto sm:w-[540px] p-3 sm:p-4 flex items-center justify-between z-20 pointer-events-auto">
+  <div id="hud-top" class="cosmic-plate absolute top-3 left-3 right-3 sm:top-4 sm:left-4 sm:right-auto sm:w-[540px] p-2 sm:p-3 flex items-center justify-between z-20 pointer-events-auto hud-text-glow">
     <div class="flex items-center gap-2.5 sm:gap-3">
-      <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-br from-purple-600/40 to-pink-600/40 border-2 border-purple-400/60 flex items-center justify-center text-lg sm:text-xl shadow-inner shrink-0">
+      <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-br from-purple-600/60 to-pink-600/60 border-2 border-purple-400 flex items-center justify-center text-lg sm:text-xl shadow-lg shrink-0">
         🌌
       </div>
       <div>
-        <div id="i18n-hud-title" class="text-[9px] sm:text-[10px] font-black text-purple-300 tracking-wider uppercase">3D SUDOKU COMMAND CENTER</div>
-        <div class="text-[11px] sm:text-xs font-black text-white flex items-center gap-1.5 sm:gap-2 flex-wrap">
+        <div id="i18n-hud-title" class="text-[9px] sm:text-[10px] font-black text-purple-300 tracking-wider uppercase drop-shadow">3D SUDOKU COMMAND CENTER</div>
+        <div class="text-[11px] sm:text-xs font-black text-white flex items-center gap-1.5 sm:gap-2 flex-wrap drop-shadow">
           <span><span id="i18n-time-label">⏱️ 時間</span>: <strong id="timer-display" class="text-amber-300 font-mono">00:00</strong></span>
           <span class="text-purple-400">|</span>
           <span><span id="i18n-best-label">🏆 最佳</span>: <strong id="best-time-display" class="text-yellow-300 font-mono">--:--</strong></span>
@@ -192,8 +197,12 @@
     </div>
   </div>
 
-  <!-- FLOATING TOOLBAR HUD (ASSIST / HINT / CHECK ERRORS) -->
-  <div id="hud-tools" class="cosmic-plate absolute top-20 left-3 right-3 sm:top-4 sm:right-4 sm:left-auto p-2 flex items-center justify-center gap-2 z-20 pointer-events-auto">
+  <!-- FLOATING TOOLBAR HUD (ASSIST / HINT / CHECK ERRORS / SWITCH FACE) -->
+  <div id="hud-tools" class="cosmic-plate absolute top-20 left-3 right-3 sm:top-4 sm:right-4 sm:left-auto p-2 flex items-center justify-center gap-2 z-20 pointer-events-auto hud-text-glow">
+    <button onclick="gameApp.cycleFace()" id="switch-face-btn" class="cosmic-btn px-2.5 py-1.5 bg-purple-800/90 text-purple-100 text-xs border border-purple-300 flex items-center gap-1">
+      <span>🎲</span> <span id="i18n-face-label">面: 1/6</span>
+    </button>
+
     <button onclick="gameApp.toggleAssistant()" id="assist-toggle-btn" class="cosmic-btn px-2.5 py-1.5 bg-emerald-800/90 text-emerald-200 text-xs border border-emerald-400 flex items-center gap-1">
       <span>🛡️</span> <span id="i18n-assist-label">輔助: 開</span>
     </button>
@@ -294,9 +303,10 @@
         assistLabelOff: "輔助: 關",
         hintLabel: "提示",
         checkLabel: "檢查",
+        faceText: "面",
         paletteLabel: "數字選單 (可拖曳/切換直向)",
         clearBtn: "清除",
-        defaultGuidance: "點擊 3D 方塊進行選擇 | 拖曳選盤可轉為側欄",
+        defaultGuidance: "點擊 3D 方塊進行選擇 | 點擊「面」按鈕可輪播切換視角",
         winTitle: "星際魔方數獨完美通關！",
         winMsg: "所有 6 個立面皆無重複數字，解鎖率 100%！",
         winTime: "完成耗時",
@@ -327,9 +337,10 @@
         assistLabelOff: "Assist: OFF",
         hintLabel: "Hint",
         checkLabel: "Check",
+        faceText: "Face",
         paletteLabel: "Number Palette (Draggable / Vertical)",
         clearBtn: "Clear",
-        defaultGuidance: "Tap 3D tile | Drag palette to side for vertical bar",
+        defaultGuidance: "Tap 3D tile | Click 'Face' button to switch cube face",
         winTitle: "Cosmic Cube Sudoku Solved!",
         winMsg: "All 6 faces satisfied without duplicate numbers! 100% Cleared!",
         winTime: "Time Elapsed",
@@ -436,6 +447,9 @@
         this.lang = 'zh';
         this.assistantMode = true;
         this.isPaletteVertical = false;
+
+        this.currentFaceIndex = 0; // 0 to 5 for Faces 1 to 6
+        this.targetRotation = null; // Smooth rotation lerp target
 
         this.clearCount = parseInt(localStorage.getItem('cosmic_cube_clears') || '0', 10);
         const clearElem = document.getElementById('score-clear');
@@ -621,10 +635,36 @@
         document.getElementById('i18n-next-btn').innerText = t.nextBtn;
         this.updateGuidance(t.defaultGuidance);
 
+        const faceElem = document.getElementById('switch-face-btn').querySelector('#i18n-face-label');
+        if (faceElem) faceElem.innerText = `${t.faceText}: ${this.currentFaceIndex + 1}/6`;
+
         const assistElem = document.getElementById('assist-toggle-btn').querySelector('#i18n-assist-label');
         if (assistElem) assistElem.innerText = this.assistantMode ? t.assistLabelOn : t.assistLabelOff;
         this.updateBestTimeDisplay();
         this.updateProgressDisplay();
+      }
+
+      cycleFace() {
+        // Cycle face from 1 to 6 (index 0 to 5)
+        this.currentFaceIndex = (this.currentFaceIndex + 1) % 6;
+        
+        const faceRotations = [
+          { x: 0, y: 0 },               // Face 1: Front
+          { x: 0, y: Math.PI },          // Face 2: Back
+          { x: 0, y: -Math.PI / 2 },     // Face 3: Right
+          { x: 0, y: Math.PI / 2 },      // Face 4: Left
+          { x: Math.PI / 2, y: 0 },      // Face 5: Top
+          { x: -Math.PI / 2, y: 0 }      // Face 6: Bottom
+        ];
+
+        this.targetRotation = faceRotations[this.currentFaceIndex];
+        this.rotVelocity = { x: 0, y: 0 };
+        this.sound.playSelect();
+
+        const t = I18N[this.lang];
+        const faceElem = document.getElementById('switch-face-btn').querySelector('#i18n-face-label');
+        if (faceElem) faceElem.innerText = `${t.faceText}: ${this.currentFaceIndex + 1}/6`;
+        this.updateGuidance(`🎲 Switched to Face ${this.currentFaceIndex + 1} / 6`);
       }
 
       updateGuidance(msg) {
@@ -1134,6 +1174,7 @@
           this.hasMoved = false;
           this.dragStart = pos;
           this.rotVelocity = { x: 0, y: 0 };
+          this.targetRotation = null; // Cancel smooth transition if user starts manual drag
         };
 
         const onMove = (e) => {
@@ -1257,7 +1298,20 @@
       animate() {
         requestAnimationFrame(() => this.animate());
 
-        if (!this.isDragging) {
+        if (this.targetRotation) {
+          // Smoothly interpolate rotation to target face
+          this.cubeGroup.rotation.x += (this.targetRotation.x - this.cubeGroup.rotation.x) * 0.12;
+          this.cubeGroup.rotation.y += (this.targetRotation.y - this.cubeGroup.rotation.y) * 0.12;
+
+          if (
+            Math.abs(this.targetRotation.x - this.cubeGroup.rotation.x) < 0.005 &&
+            Math.abs(this.targetRotation.y - this.cubeGroup.rotation.y) < 0.005
+          ) {
+            this.cubeGroup.rotation.x = this.targetRotation.x;
+            this.cubeGroup.rotation.y = this.targetRotation.y;
+            this.targetRotation = null;
+          }
+        } else if (!this.isDragging) {
           this.cubeGroup.rotation.y += this.rotVelocity.y;
           this.cubeGroup.rotation.x += this.rotVelocity.x;
           this.rotVelocity.y *= 0.92;
